@@ -1,102 +1,102 @@
 # Regieleki
 
-**Blazing fast PixelDrain TUI downloader**
+**Blazing-fast PixelDrain downloader with a 6 GB limit bypass**
 
-Regieleki é um downloader de terminal feito em Go, com Cobra, Bubble Tea e Lip Gloss. Ele recebe o ID de um arquivo, monta o endpoint configurado e baixa o arquivo em streaming para o computador.
+Regieleki is a terminal-based downloader written in Go, using Cobra, Bubble Tea, and Lip Gloss. It takes a file ID, builds the configured endpoint, and downloads the file to your computer using streaming.
 
-## Requisitos
+## Requirements
 
-- Go 1.26 ou superior
-- Conexão com a internet
+* Go 1.26 or later
+* Internet connection
 
-## Executar em desenvolvimento
+## Running in Development
 
-Na raiz do projeto:
+From the project root:
 
 ```powershell
 go run .
 ```
 
-Digite o ID do arquivo na TUI e pressione `Enter`. O download começa automaticamente.
+Enter the file ID in the TUI and press `Enter`. The download will start automatically.
 
-Para escolher a pasta de destino:
+To choose the destination directory:
 
 ```powershell
 go run . --output-dir downloads
 ```
 
-Também é possível usar o caminho curto:
+You can also use the short option:
 
 ```powershell
 go run . -o downloads
 ```
 
-## Gerar o binário
+## Building the Binary
 
-O script do Windows gera `bin/regieleki.exe` com flags para reduzir o tamanho:
+The Windows script generates `bin/regieleki.exe` using flags to reduce the binary size:
 
 ```powershell
 .\build.ps1
 ```
 
-O build usa:
+The build uses:
 
-- `-trimpath` para remover caminhos locais do binário;
-- `-buildvcs=false` para não incluir metadados do Git;
-- `-ldflags="-s -w"` para remover símbolos e informações de debug.
+* `-trimpath` to remove local file paths from the binary;
+* `-buildvcs=false` to avoid including Git metadata;
+* `-ldflags="-s -w"` to remove symbols and debug information.
 
-O comando equivalente, em qualquer sistema com Go instalado, é:
+The equivalent command on any system with Go installed is:
 
 ```bash
 go build -trimpath -buildvcs=false -ldflags="-s -w" -o bin/regieleki .
 ```
 
-Depois, execute:
+Then run:
 
 ```powershell
 .\bin\regieleki.exe
 ```
 
-O executável gerado é ignorado pelo Git; apenas `bin/.gitkeep` mantém a pasta no projeto.
+The generated executable is ignored by Git; only `bin/.gitkeep` is used to keep the directory in the repository.
 
-## Comandos
+## Commands
 
-Abrir a TUI:
+Open the TUI:
 
 ```powershell
 regieleki
 ```
 
-Gerar a URL de download sem abrir a TUI:
+Generate the download URL without opening the TUI:
 
 ```powershell
 regieleki convert e75isJ7y
 regieleki convert https://pixeldrain.com/u/e75isJ7y
 ```
 
-O comando `convert` imprime a URL. O download automático acontece no fluxo interativo da TUI.
+The `convert` command prints the URL. Automatic downloading happens through the interactive TUI flow.
 
-## Controles da TUI
+## TUI Controls
 
-- Digitar: informar o ID;
-- `Enter`: iniciar o download;
-- `Enter` após um erro: tentar novamente;
-- `Enter` após concluir: começar outro download;
-- `Esc` ou `Ctrl+C`: sair.
+* Type: enter the file ID;
+* `Enter`: start the download;
+* `Enter` after an error: try again;
+* `Enter` after completion: start another download;
+* `Esc` or `Ctrl+C`: exit.
 
-Durante o download, a interface mostra progresso, tamanho recebido, porcentagem quando o servidor informa o tamanho total, velocidade atual e destino.
+During the download, the interface displays the progress, amount of data received, percentage when the server provides the total file size, current download speed, and destination path.
 
-## Comportamento dos arquivos
+## File Behavior
 
-- O nome é obtido do header `Content-Disposition` quando disponível;
-- Se não houver nome, o arquivo recebe `file_<id>`;
-- Arquivos existentes não são sobrescritos: o programa cria nomes como `arquivo (1).zip`;
-- Downloads incompletos são removidos quando ocorre uma falha.
+* The filename is obtained from the `Content-Disposition` header when available;
+* If no filename is provided, the file is named `file_<id>`;
+* Existing files are not overwritten: the program creates names such as `file (1).zip`;
+* Incomplete downloads are removed if an error occurs.
 
-## Testes
+## Tests
 
 ```bash
 go test ./...
 ```
 
-O endpoint usado pelo projeto está configurado em `workerBaseURL`, no arquivo `main.go`.
+The endpoint used by the project is configured in `workerBaseURL`, located in the `main.go` file.
