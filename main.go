@@ -427,9 +427,6 @@ func (model *model) View() string {
 		content = append(content, "", model.completedView())
 	case stateError:
 		errorMessage := fmt.Sprintf("Falha no download:\n%s", model.downloadError)
-		if model.conversion != nil {
-			errorMessage += fmt.Sprintf("\n\nURL:\n%s", model.conversion.DownloadURL)
-		}
 		content = append(content, "", errorStyle.Render(errorMessage))
 		content = append(content, helpStyle.Render("Pressione Enter para tentar novamente ou Esc para sair."))
 	default:
