@@ -9,8 +9,9 @@ import (
 var outputDirectory string
 
 var rootCommand = &cobra.Command{
-	Use:   "regieleki",
-	Short: "Blazing fast PixelDrain TUI downloader",
+	Use:     "regieleki",
+	Short:   "Blazing fast PixelDrain TUI downloader",
+	Version: version,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		return runInteractive(outputDirectory)
 	},
