@@ -34,3 +34,14 @@ func TestConvertInputRejectsInvalidID(t *testing.T) {
 		t.Fatal("expected an invalid ID error")
 	}
 }
+
+func TestConvertInputNormalizesPastedID(t *testing.T) {
+	conversion, err := convertInput(" \u200bAXCPM2gM\r\n")
+	if err != nil {
+		t.Fatalf("convertInput returned an error: %v", err)
+	}
+
+	if conversion.FileID != "AXCPM2gM" {
+		t.Fatalf("expected file ID AXCPM2gM, got %q", conversion.FileID)
+	}
+}

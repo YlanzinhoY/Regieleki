@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 const workerBaseURL = "https://cdn18.pixeldrain.eu.cc/api/file"
@@ -20,7 +21,7 @@ type Conversion struct {
 }
 
 func convertInput(input string) (Conversion, error) {
-	input = strings.TrimSpace(input)
+	input = normalizeInput(input)
 	if input == "" {
 		return Conversion{}, errors.New("informe o ID do arquivo")
 	}
@@ -37,4 +38,13 @@ func convertInput(input string) (Conversion, error) {
 		FileID:      fileID,
 		DownloadURL: fmt.Sprintf("%s/%s", workerBaseURL, fileID),
 	}, nil
+}
+
+func normalizeInput(input string) string {
+	return strings.Map(func(character rune) rune {
+		if unicode.IsSpace(character) || unicode.IsControl(character) || unicode.Is(unicode.Cf, character) {
+			return -1
+		}
+		return character
+	}, input)
 }

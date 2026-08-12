@@ -157,7 +157,12 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyRunes:
 		if model.state == stateInput {
-			model.input += string(message.Runes)
+			pastedInput := string(message.Runes)
+			if message.Paste {
+				model.input = normalizeInput(pastedInput)
+			} else {
+				model.input += pastedInput
+			}
 		}
 	}
 
