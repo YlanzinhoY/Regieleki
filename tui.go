@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -73,6 +74,7 @@ type model struct {
 	speed         float64
 	outputPath    string
 	downloadError error
+	cdnBlocked    bool
 	outputDir     string
 	downloadCtx   context.Context
 	cancel        context.CancelFunc
@@ -111,6 +113,8 @@ func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case downloadFailedMsg:
 		model.state = stateError
 		model.downloadError = message.Err
+		var limitError *cdnLimitError
+		model.cdnBlocked = errors.As(message.Err, &limitError)
 	}
 
 	return model, nil
@@ -132,6 +136,13 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 		if model.state == stateError && model.conversion != nil {
+			if model.cdnBlocked {
+				model.state = stateInput
+				model.downloadError = nil
+				model.conversion = nil
+				model.cdnBlocked = false
+				return model, nil
+			}
 			return model, model.beginDownload(*model.conversion)
 		}
 		if model.state == stateError {
@@ -176,6 +187,7 @@ func (model *model) beginDownload(conversion Conversion) tea.Cmd {
 	model.total = 0
 	model.speed = 0
 	model.downloadError = nil
+	model.cdnBlocked = false
 	return startDownload(model.downloadCtx, conversion, model.outputDir, model.send)
 }
 
@@ -188,6 +200,7 @@ func (model *model) reset() {
 	model.speed = 0
 	model.outputPath = ""
 	model.downloadError = nil
+	model.cdnBlocked = false
 }
 
 func (model *model) View() string {
@@ -206,7 +219,11 @@ func (model *model) View() string {
 	case stateError:
 		errorMessage := fmt.Sprintf("Download failed:\n%s", model.downloadError)
 		content = append(content, "", errorStyle.Render(errorMessage))
-		content = append(content, helpStyle.Render("Press Enter to try again or Esc to exit."))
+		if model.cdnBlocked {
+			content = append(content, helpStyle.Render("The CDN limit was reached. Press Enter to enter another ID or Esc to exit."))
+		} else {
+			content = append(content, helpStyle.Render("Press Enter to try again or Esc to exit."))
+		}
 	default:
 		content = append(content, helpStyle.Render("Enter downloads the file  |  Esc/Ctrl+C exits"))
 	}

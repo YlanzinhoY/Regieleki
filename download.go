@@ -27,6 +27,14 @@ type downloadResult struct {
 	AverageSpeed float64
 }
 
+type cdnLimitError struct {
+	StatusCode int
+}
+
+func (err *cdnLimitError) Error() string {
+	return fmt.Sprintf("the CDN refused this request with HTTP %d; wait before trying again", err.StatusCode)
+}
+
 type progressWriter struct {
 	writer     io.Writer
 	downloaded int64
@@ -82,6 +90,9 @@ func downloadFile(
 	defer response.Body.Close()
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		if response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusTooManyRequests {
+			return downloadResult{}, &cdnLimitError{StatusCode: response.StatusCode}
+		}
 		body, readErr := io.ReadAll(io.LimitReader(response.Body, 2048))
 		message := compactMessage(string(body))
 		if readErr != nil || message == "" {
