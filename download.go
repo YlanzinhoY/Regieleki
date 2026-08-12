@@ -1,0 +1,203 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"mime"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+type downloadProgress struct {
+	Downloaded int64
+	Total      int64
+	Speed      float64
+}
+
+type downloadResult struct {
+	Path         string
+	Downloaded   int64
+	Total        int64
+	Elapsed      time.Duration
+	AverageSpeed float64
+}
+
+type progressWriter struct {
+	writer     io.Writer
+	downloaded int64
+	total      int64
+	startedAt  time.Time
+	lastReport time.Time
+	report     func(downloadProgress)
+}
+
+func (writer *progressWriter) Write(chunk []byte) (int, error) {
+	bytesWritten, err := writer.writer.Write(chunk)
+	writer.downloaded += int64(bytesWritten)
+
+	now := time.Now()
+	if writer.lastReport.IsZero() || now.Sub(writer.lastReport) >= 100*time.Millisecond || err != nil {
+		writer.emit(now)
+	}
+
+	return bytesWritten, err
+}
+
+func (writer *progressWriter) emit(now time.Time) {
+	elapsed := now.Sub(writer.startedAt)
+	speed := float64(writer.downloaded)
+	if elapsed > 0 {
+		speed /= elapsed.Seconds()
+	}
+	writer.report(downloadProgress{
+		Downloaded: writer.downloaded,
+		Total:      writer.total,
+		Speed:      speed,
+	})
+	writer.lastReport = now
+}
+
+func downloadFile(
+	ctx context.Context,
+	conversion Conversion,
+	directory string,
+	report func(downloadProgress),
+) (downloadResult, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, conversion.DownloadURL, nil)
+	if err != nil {
+		return downloadResult{}, fmt.Errorf("criando requisicao: %w", err)
+	}
+	request.Header.Set("User-Agent", "regieleki/1.0")
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		return downloadResult{}, fmt.Errorf("conectando ao worker: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		body, readErr := io.ReadAll(io.LimitReader(response.Body, 2048))
+		message := compactMessage(string(body))
+		if readErr != nil || message == "" {
+			message = http.StatusText(response.StatusCode)
+		}
+		return downloadResult{}, fmt.Errorf("worker respondeu HTTP %d: %s", response.StatusCode, message)
+	}
+
+	filename := responseFilename(response, conversion.FileID)
+	file, path, err := createOutputFile(directory, filename)
+	if err != nil {
+		return downloadResult{}, err
+	}
+
+	keepFile := false
+	defer func() {
+		if !keepFile {
+			_ = file.Close()
+			_ = os.Remove(path)
+		}
+	}()
+
+	if report == nil {
+		report = func(downloadProgress) {}
+	}
+	startedAt := time.Now()
+	writer := &progressWriter{
+		writer:    file,
+		total:     response.ContentLength,
+		startedAt: startedAt,
+		report:    report,
+	}
+	_, err = io.CopyBuffer(writer, response.Body, make([]byte, 64*1024))
+	if err != nil {
+		return downloadResult{}, fmt.Errorf("baixando arquivo: %w", err)
+	}
+	writer.emit(time.Now())
+
+	if err := file.Close(); err != nil {
+		return downloadResult{}, fmt.Errorf("fechando arquivo: %w", err)
+	}
+	keepFile = true
+
+	elapsed := time.Since(startedAt)
+	if elapsed <= 0 {
+		elapsed = time.Nanosecond
+	}
+	averageSpeed := float64(writer.downloaded) / elapsed.Seconds()
+
+	return downloadResult{
+		Path:         path,
+		Downloaded:   writer.downloaded,
+		Total:        response.ContentLength,
+		Elapsed:      elapsed,
+		AverageSpeed: averageSpeed,
+	}, nil
+}
+
+func responseFilename(response *http.Response, fileID string) string {
+	disposition := response.Header.Get("Content-Disposition")
+	if disposition != "" {
+		_, parameters, err := mime.ParseMediaType(disposition)
+		if err == nil {
+			for _, key := range []string{"filename", "filename*"} {
+				if name := safeFilename(parameters[key], ""); name != "" {
+					return name
+				}
+			}
+		}
+	}
+	return "file_" + fileID
+}
+
+func compactMessage(message string) string {
+	message = strings.Join(strings.Fields(message), " ")
+	if len(message) > 240 {
+		return message[:240] + "..."
+	}
+	return message
+}
+
+func safeFilename(name string, fallback string) string {
+	name = strings.ReplaceAll(strings.TrimSpace(name), "\x00", "")
+	name = filepath.Base(name)
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return fallback
+	}
+	return name
+}
+
+func createOutputFile(directory string, filename string) (*os.File, string, error) {
+	if directory == "" {
+		directory = "."
+	}
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return nil, "", fmt.Errorf("criando pasta de destino: %w", err)
+	}
+
+	filename = safeFilename(filename, "download")
+	extension := filepath.Ext(filename)
+	stem := strings.TrimSuffix(filename, extension)
+
+	for attempt := 0; attempt < 10000; attempt++ {
+		candidate := filename
+		if attempt > 0 {
+			candidate = fmt.Sprintf("%s (%d)%s", stem, attempt, extension)
+		}
+		path := filepath.Join(directory, candidate)
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if err == nil {
+			return file, path, nil
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return nil, "", fmt.Errorf("criando arquivo de destino: %w", err)
+		}
+	}
+
+	return nil, "", errors.New("nao foi possivel encontrar um nome de arquivo livre")
+}
