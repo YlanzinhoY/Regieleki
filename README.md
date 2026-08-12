@@ -101,4 +101,14 @@ During the download, the interface displays the progress, amount of data receive
 go test ./...
 ```
 
+The large CDN download test is opt-in because it consumes at least 6 GB of bandwidth. It streams the response to `io.Discard`, so it does not save the downloaded files to disk. On Windows, run it from PowerShell:
+
+```powershell
+$env:REGIELEKI_RUN_LARGE_DOWNLOAD_TEST = "1"
+go test -run '^TestCDNAllowsMoreThanSixGB$' -count=1 -v
+Remove-Item Env:REGIELEKI_RUN_LARGE_DOWNLOAD_TEST
+```
+
+The test uses file ID `KpQfUiTC` and repeats the request until the cumulative amount exceeds 6 GB.
+
 The endpoint used by the project is configured in `workerBaseURL`, located in `conversion.go`.
