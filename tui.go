@@ -389,6 +389,7 @@ func startDownload(
 }
 
 func runInteractive(outputDir string) error {
+	configureConsoleWindow()
 	downloadContext, cancel := context.WithCancel(context.Background())
 	appModel := newModel(outputDir, downloadContext, cancel)
 	program := tea.NewProgram(appModel, tea.WithAltScreen())
