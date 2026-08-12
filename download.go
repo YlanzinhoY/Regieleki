@@ -70,14 +70,14 @@ func downloadFile(
 ) (downloadResult, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, conversion.DownloadURL, nil)
 	if err != nil {
-		return downloadResult{}, fmt.Errorf("criando requisicao: %w", err)
+		return downloadResult{}, fmt.Errorf("creating request: %w", err)
 	}
 	request.Header.Set("User-Agent", "regieleki/1.0")
 
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		return downloadResult{}, fmt.Errorf("conectando ao worker: %w", err)
+		return downloadResult{}, fmt.Errorf("connecting to worker: %w", err)
 	}
 	defer response.Body.Close()
 
@@ -87,7 +87,7 @@ func downloadFile(
 		if readErr != nil || message == "" {
 			message = http.StatusText(response.StatusCode)
 		}
-		return downloadResult{}, fmt.Errorf("worker respondeu HTTP %d: %s", response.StatusCode, message)
+		return downloadResult{}, fmt.Errorf("worker returned HTTP %d: %s", response.StatusCode, message)
 	}
 
 	filename := responseFilename(response, conversion.FileID)
@@ -116,12 +116,12 @@ func downloadFile(
 	}
 	_, err = io.CopyBuffer(writer, response.Body, make([]byte, 64*1024))
 	if err != nil {
-		return downloadResult{}, fmt.Errorf("baixando arquivo: %w", err)
+		return downloadResult{}, fmt.Errorf("downloading file: %w", err)
 	}
 	writer.emit(time.Now())
 
 	if err := file.Close(); err != nil {
-		return downloadResult{}, fmt.Errorf("fechando arquivo: %w", err)
+		return downloadResult{}, fmt.Errorf("closing file: %w", err)
 	}
 	keepFile = true
 
@@ -177,7 +177,7 @@ func createOutputFile(directory string, filename string) (*os.File, string, erro
 		directory = "."
 	}
 	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return nil, "", fmt.Errorf("criando pasta de destino: %w", err)
+		return nil, "", fmt.Errorf("creating output directory: %w", err)
 	}
 
 	filename = safeFilename(filename, "download")
@@ -195,9 +195,9 @@ func createOutputFile(directory string, filename string) (*os.File, string, erro
 			return file, path, nil
 		}
 		if !errors.Is(err, os.ErrExist) {
-			return nil, "", fmt.Errorf("criando arquivo de destino: %w", err)
+			return nil, "", fmt.Errorf("creating output file: %w", err)
 		}
 	}
 
-	return nil, "", errors.New("nao foi possivel encontrar um nome de arquivo livre")
+	return nil, "", errors.New("could not find an available filename")
 }

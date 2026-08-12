@@ -194,7 +194,7 @@ func (model *model) View() string {
 	content := []string{
 		titleStyle.Render("Regieleki"),
 		"Blazing fast PixelDrain TUI downloader",
-		"Digite o ID do arquivo:",
+		"Enter the file ID:",
 		inputStyle.Render(model.input),
 	}
 
@@ -204,11 +204,11 @@ func (model *model) View() string {
 	case stateCompleted:
 		content = append(content, "", model.completedView())
 	case stateError:
-		errorMessage := fmt.Sprintf("Falha no download:\n%s", model.downloadError)
+		errorMessage := fmt.Sprintf("Download failed:\n%s", model.downloadError)
 		content = append(content, "", errorStyle.Render(errorMessage))
-		content = append(content, helpStyle.Render("Pressione Enter para tentar novamente ou Esc para sair."))
+		content = append(content, helpStyle.Render("Press Enter to try again or Esc to exit."))
 	default:
-		content = append(content, helpStyle.Render("Enter baixa o arquivo  |  Esc/Ctrl+C sai"))
+		content = append(content, helpStyle.Render("Enter downloads the file  |  Esc/Ctrl+C exits"))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, content...)
@@ -221,11 +221,11 @@ func (model *model) downloadView() string {
 		percentage := float64(model.downloaded) / float64(model.total) * 100
 		size = fmt.Sprintf("%s / %s (%.1f%%)", size, formatBytes(model.total), percentage)
 	} else {
-		size += " / tamanho desconhecido"
+		size += " / unknown size"
 	}
 
 	return panelStyle.Render(fmt.Sprintf(
-		"Baixando: %s\n\n%s\n%s\nVelocidade: %s\nDestino: %s",
+		"Downloading: %s\n\n%s\n%s\nSpeed: %s\nDestination: %s",
 		model.conversion.FileID,
 		progress,
 		size,
@@ -236,7 +236,7 @@ func (model *model) downloadView() string {
 
 func (model *model) completedView() string {
 	return successStyle.Render(fmt.Sprintf(
-		"Download concluido!\n\nArquivo: %s\nTamanho: %s\nVelocidade media: %s\nSalvo em: %s",
+		"Download completed!\n\nFile: %s\nSize: %s\nAverage speed: %s\nSaved to: %s",
 		model.conversion.FileID,
 		formatBytes(model.downloaded),
 		formatSpeed(model.speed),
@@ -246,7 +246,7 @@ func (model *model) completedView() string {
 
 func progressBar(downloaded int64, total int64, width int) string {
 	if total <= 0 {
-		return "[ streaming | tamanho desconhecido ]"
+		return "[ streaming | unknown size ]"
 	}
 
 	ratio := float64(downloaded) / float64(total)
@@ -262,7 +262,7 @@ func progressBar(downloaded int64, total int64, width int) string {
 
 func formatBytes(bytes int64) string {
 	if bytes < 0 {
-		return "desconhecido"
+		return "unknown"
 	}
 	units := []string{"B", "KiB", "MiB", "GiB", "TiB"}
 	value := float64(bytes)
@@ -279,7 +279,7 @@ func formatBytes(bytes int64) string {
 
 func formatSpeed(bytesPerSecond float64) string {
 	if bytesPerSecond <= 0 {
-		return "calculando..."
+		return "calculating..."
 	}
 	return formatBytes(int64(bytesPerSecond)) + "/s"
 }

@@ -17,8 +17,8 @@ var rootCommand = &cobra.Command{
 }
 
 var convertCommand = &cobra.Command{
-	Use:   "convert [id-ou-url]",
-	Short: "Gera a URL de download a partir do ID",
+	Use:   "convert [id-or-url]",
+	Short: "Generate the download URL from the file ID",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(command *cobra.Command, arguments []string) error {
 		if len(arguments) == 0 {
@@ -42,7 +42,8 @@ func init() {
 		"output-dir",
 		"o",
 		defaultDownloadDirectory(),
-		"pasta onde os arquivos serão salvos",
+		"directory where files will be saved",
 	)
+	rootCommand.PersistentFlags().Lookup("output-dir").Usage = "directory where files will be saved"
 	rootCommand.AddCommand(convertCommand)
 }

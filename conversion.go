@@ -23,7 +23,7 @@ type Conversion struct {
 func convertInput(input string) (Conversion, error) {
 	input = normalizeInput(input)
 	if input == "" {
-		return Conversion{}, errors.New("informe o ID do arquivo")
+		return Conversion{}, errors.New("enter a file ID")
 	}
 
 	fileID := input
@@ -31,7 +31,7 @@ func convertInput(input string) (Conversion, error) {
 		fileID = match[1]
 	}
 	if !fileIDPattern.MatchString(fileID) {
-		return Conversion{}, errors.New("ID de arquivo invalido")
+		return Conversion{}, errors.New("invalid file ID")
 	}
 
 	return Conversion{
