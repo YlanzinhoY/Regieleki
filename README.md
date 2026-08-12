@@ -113,4 +113,6 @@ Remove-Item Env:REGIELEKI_LARGE_DOWNLOAD_DELAY
 
 The test uses file ID `KpQfUiTC`, waits 60 seconds between requests by default, and repeats the request until the cumulative amount exceeds 6 GB. Set `REGIELEKI_LARGE_DOWNLOAD_DELAY` to another Go duration if needed.
 
+The application does not rotate CDN hostnames to bypass a server block. Responses `403 Forbidden` and `429 Too Many Requests` stop the current download, and the TUI requires a new attempt instead of retrying the blocked request automatically.
+
 The endpoint used by the project is configured in `workerBaseURL`, located in `conversion.go`.
