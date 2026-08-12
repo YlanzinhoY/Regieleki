@@ -76,13 +76,44 @@ func downloadFile(
 	directory string,
 	report func(downloadProgress),
 ) (downloadResult, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, conversion.DownloadURL, nil)
+	downloadURLs := conversion.DownloadURLs
+	if len(downloadURLs) == 0 && conversion.DownloadURL != "" {
+		downloadURLs = []string{conversion.DownloadURL}
+	}
+	if len(downloadURLs) == 0 {
+		return downloadResult{}, errors.New("no CDN mirrors configured")
+	}
+
+	client := &http.Client{}
+	var lastError error
+	for _, downloadURL := range downloadURLs {
+		result, err := downloadFromURL(ctx, client, conversion, downloadURL, directory, report)
+		if err == nil {
+			return result, nil
+		}
+		if ctx.Err() != nil {
+			return downloadResult{}, ctx.Err()
+		}
+		lastError = err
+	}
+
+	return downloadResult{}, fmt.Errorf("all CDN mirrors failed: %w", lastError)
+}
+
+func downloadFromURL(
+	ctx context.Context,
+	client *http.Client,
+	conversion Conversion,
+	downloadURL string,
+	directory string,
+	report func(downloadProgress),
+) (downloadResult, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return downloadResult{}, fmt.Errorf("creating request: %w", err)
 	}
 	request.Header.Set("User-Agent", "regieleki/1.0")
 
-	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
 		return downloadResult{}, fmt.Errorf("connecting to worker: %w", err)
