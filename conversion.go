@@ -8,7 +8,11 @@ import (
 	"unicode"
 )
 
-const workerBaseURL = "https://cdn18.pixeldrain.eu.cc/api/file"
+const (
+	workerBaseURL     = "https://cdn18.pixeldrain.eu.cc/api/file"
+	workerMirrorStart = 18
+	workerMirrorEnd   = 50
+)
 
 var workerBaseURLs = buildWorkerBaseURLs()
 
@@ -50,8 +54,8 @@ func convertInput(input string) (Conversion, error) {
 }
 
 func buildWorkerBaseURLs() []string {
-	baseURLs := make([]string, 0, 33)
-	for hostNumber := 18; hostNumber <= 50; hostNumber++ {
+	baseURLs := make([]string, 0, workerMirrorEnd-workerMirrorStart+1)
+	for hostNumber := workerMirrorStart; hostNumber <= workerMirrorEnd; hostNumber++ {
 		baseURLs = append(baseURLs, fmt.Sprintf("https://cdn%d.pixeldrain.eu.cc/api/file", hostNumber))
 	}
 	return baseURLs

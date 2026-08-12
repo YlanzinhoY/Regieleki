@@ -55,6 +55,7 @@ type downloadProgressMsg struct {
 	Downloaded int64
 	Total      int64
 	Speed      float64
+	Mirror     int
 }
 
 type downloadCompletedMsg struct {
@@ -72,6 +73,7 @@ type model struct {
 	downloaded    int64
 	total         int64
 	speed         float64
+	mirror        int
 	outputPath    string
 	downloadError error
 	cdnBlocked    bool
@@ -103,18 +105,28 @@ func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.downloaded = message.Downloaded
 			model.total = message.Total
 			model.speed = message.Speed
+			if message.Mirror > 0 {
+				model.mirror = message.Mirror
+			}
 		}
 	case downloadCompletedMsg:
 		model.state = stateCompleted
 		model.downloaded = message.Result.Downloaded
 		model.total = message.Result.Total
 		model.speed = message.Result.AverageSpeed
+		model.mirror = message.Result.Mirror
 		model.outputPath = message.Result.Path
 	case downloadFailedMsg:
 		model.state = stateError
 		model.downloadError = message.Err
 		var limitError *cdnLimitError
 		model.cdnBlocked = errors.As(message.Err, &limitError)
+		var mirrorError *cdnMirrorError
+		if errors.As(message.Err, &mirrorError) {
+			model.mirror = mirrorError.Mirror
+		} else if model.cdnBlocked && limitError.Mirror > 0 {
+			model.mirror = limitError.Mirror
+		}
 	}
 
 	return model, nil
@@ -186,6 +198,7 @@ func (model *model) beginDownload(conversion Conversion) tea.Cmd {
 	model.downloaded = 0
 	model.total = 0
 	model.speed = 0
+	model.mirror = 0
 	model.downloadError = nil
 	model.cdnBlocked = false
 	return startDownload(model.downloadCtx, conversion, model.outputDir, model.send)
@@ -198,6 +211,7 @@ func (model *model) reset() {
 	model.downloaded = 0
 	model.total = 0
 	model.speed = 0
+	model.mirror = 0
 	model.outputPath = ""
 	model.downloadError = nil
 	model.cdnBlocked = false
@@ -217,7 +231,7 @@ func (model *model) View() string {
 	case stateCompleted:
 		content = append(content, "", model.completedView())
 	case stateError:
-		errorMessage := fmt.Sprintf("Download failed:\n%s", model.downloadError)
+		errorMessage := fmt.Sprintf("Download failed on Mirror %d:\n%s", model.mirror, model.downloadError)
 		content = append(content, "", errorStyle.Render(errorMessage))
 		if model.cdnBlocked {
 			content = append(content, helpStyle.Render("The CDN limit was reached. Press Enter to enter another ID or Esc to exit."))
@@ -242,8 +256,9 @@ func (model *model) downloadView() string {
 	}
 
 	return panelStyle.Render(fmt.Sprintf(
-		"Downloading: %s\n\n%s\n%s\nSpeed: %s\nDestination: %s",
+		"Downloading: %s\nMirror: %d\n\n%s\n%s\nSpeed: %s\nDestination: %s",
 		model.conversion.FileID,
+		model.mirror,
 		progress,
 		size,
 		formatSpeed(model.speed),
@@ -253,7 +268,8 @@ func (model *model) downloadView() string {
 
 func (model *model) completedView() string {
 	return successStyle.Render(fmt.Sprintf(
-		"Download completed!\n\nFile: %s\nSize: %s\nAverage speed: %s\nSaved to: %s",
+		"Download completed on Mirror %d!\n\nFile: %s\nSize: %s\nAverage speed: %s\nSaved to: %s",
+		model.mirror,
 		model.conversion.FileID,
 		formatBytes(model.downloaded),
 		formatSpeed(model.speed),
@@ -315,6 +331,7 @@ func startDownload(
 						Downloaded: progress.Downloaded,
 						Total:      progress.Total,
 						Speed:      progress.Speed,
+						Mirror:     progress.Mirror,
 					})
 				}
 			})

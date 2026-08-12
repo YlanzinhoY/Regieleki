@@ -17,6 +17,7 @@ type downloadProgress struct {
 	Downloaded int64
 	Total      int64
 	Speed      float64
+	Mirror     int
 }
 
 type downloadResult struct {
@@ -25,20 +26,36 @@ type downloadResult struct {
 	Total        int64
 	Elapsed      time.Duration
 	AverageSpeed float64
+	Mirror       int
 }
 
 type cdnLimitError struct {
 	StatusCode int
+	Mirror     int
 }
 
 func (err *cdnLimitError) Error() string {
-	return fmt.Sprintf("the CDN refused this request with HTTP %d; wait before trying again", err.StatusCode)
+	return fmt.Sprintf("mirror %d refused this request with HTTP %d", err.Mirror, err.StatusCode)
+}
+
+type cdnMirrorError struct {
+	Mirror int
+	Err    error
+}
+
+func (err *cdnMirrorError) Error() string {
+	return fmt.Sprintf("mirror %d failed: %v", err.Mirror, err.Err)
+}
+
+func (err *cdnMirrorError) Unwrap() error {
+	return err.Err
 }
 
 type progressWriter struct {
 	writer     io.Writer
 	downloaded int64
 	total      int64
+	mirror     int
 	startedAt  time.Time
 	lastReport time.Time
 	report     func(downloadProgress)
@@ -66,6 +83,7 @@ func (writer *progressWriter) emit(now time.Time) {
 		Downloaded: writer.downloaded,
 		Total:      writer.total,
 		Speed:      speed,
+		Mirror:     writer.mirror,
 	})
 	writer.lastReport = now
 }
@@ -83,18 +101,23 @@ func downloadFile(
 	if len(downloadURLs) == 0 {
 		return downloadResult{}, errors.New("no CDN mirrors configured")
 	}
+	if report == nil {
+		report = func(downloadProgress) {}
+	}
 
 	client := &http.Client{}
 	var lastError error
-	for _, downloadURL := range downloadURLs {
-		result, err := downloadFromURL(ctx, client, conversion, downloadURL, directory, report)
+	for mirrorIndex, downloadURL := range downloadURLs {
+		mirrorNumber := workerMirrorStart + mirrorIndex
+		report(downloadProgress{Mirror: mirrorNumber})
+		result, err := downloadFromURL(ctx, client, conversion, downloadURL, mirrorNumber, directory, report)
 		if err == nil {
 			return result, nil
 		}
 		if ctx.Err() != nil {
 			return downloadResult{}, ctx.Err()
 		}
-		lastError = err
+		lastError = &cdnMirrorError{Mirror: mirrorNumber, Err: err}
 	}
 
 	return downloadResult{}, fmt.Errorf("all CDN mirrors failed: %w", lastError)
@@ -105,6 +128,7 @@ func downloadFromURL(
 	client *http.Client,
 	conversion Conversion,
 	downloadURL string,
+	mirrorNumber int,
 	directory string,
 	report func(downloadProgress),
 ) (downloadResult, error) {
@@ -122,7 +146,7 @@ func downloadFromURL(
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		if response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusTooManyRequests {
-			return downloadResult{}, &cdnLimitError{StatusCode: response.StatusCode}
+			return downloadResult{}, &cdnLimitError{StatusCode: response.StatusCode, Mirror: mirrorNumber}
 		}
 		body, readErr := io.ReadAll(io.LimitReader(response.Body, 2048))
 		message := compactMessage(string(body))
@@ -153,6 +177,7 @@ func downloadFromURL(
 	writer := &progressWriter{
 		writer:    file,
 		total:     response.ContentLength,
+		mirror:    mirrorNumber,
 		startedAt: startedAt,
 		report:    report,
 	}
@@ -179,6 +204,7 @@ func downloadFromURL(
 		Total:        response.ContentLength,
 		Elapsed:      elapsed,
 		AverageSpeed: averageSpeed,
+		Mirror:       mirrorNumber,
 	}, nil
 }
 
