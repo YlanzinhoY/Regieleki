@@ -65,3 +65,35 @@ func TestModelInputShowsBlinkingCursor(t *testing.T) {
 		t.Fatalf("expected blinking cursor in input view, got %q", view)
 	}
 }
+
+func TestModelStopsDownloadWithEscape(t *testing.T) {
+	appModel := newModel(".", context.Background(), func() {})
+	appModel.state = stateDownloading
+	appModel.conversion = &Conversion{FileID: "KpQfUiTC"}
+	appModel.downloadCancel = func() {}
+
+	updatedModel, command := appModel.updateKey(tea.KeyMsg{Type: tea.KeyEsc})
+	updated := updatedModel.(*model)
+	if command != nil {
+		t.Fatal("expected no command when stopping a download")
+	}
+	if updated.state != stateInput {
+		t.Fatalf("expected input state, got %v", updated.state)
+	}
+	if updated.conversion != nil {
+		t.Fatal("expected the conversion to be cleared")
+	}
+	if updated.downloadCancel != nil {
+		t.Fatal("expected the download cancellation function to be cleared")
+	}
+}
+
+func TestModelViewShowsStopDownloadButton(t *testing.T) {
+	appModel := newModel(".", context.Background(), func() {})
+	appModel.state = stateDownloading
+	appModel.conversion = &Conversion{FileID: "KpQfUiTC"}
+
+	if view := appModel.View(); !strings.Contains(view, "Stop download: Esc / S") {
+		t.Fatalf("expected stop button in view, got %q", view)
+	}
+}
