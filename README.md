@@ -113,6 +113,6 @@ Remove-Item Env:REGIELEKI_LARGE_DOWNLOAD_DELAY
 
 The test uses file ID `KpQfUiTC`, waits 60 seconds between requests by default, and repeats the request until the cumulative amount exceeds 6 GB. Set `REGIELEKI_LARGE_DOWNLOAD_DELAY` to another Go duration if needed.
 
-The application does not rotate CDN hostnames to bypass a server block. Responses `403 Forbidden` and `429 Too Many Requests` stop the current download, and the TUI requires a new attempt instead of retrying the blocked request automatically.
+The application has configured CDN mirrors from `cdn18` through `cdn50`. It tries each mirror at most once for a download and moves to the next mirror when a request fails, including `403 Forbidden`, `429 Too Many Requests`, network errors, and server errors. If every mirror fails, the TUI stops and reports the failure instead of retrying forever.
 
 The endpoint used by the project is configured in `workerBaseURL`, located in `conversion.go`.
