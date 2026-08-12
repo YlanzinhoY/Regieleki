@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 )
 
 const (
-	largeDownloadTestEnv     = "REGIELEKI_RUN_LARGE_DOWNLOAD_TEST"
-	largeDownloadTargetSize  = int64(6_000_000_000)
-	largeDownloadMaxRequests = 10
+	largeDownloadTestEnv      = "REGIELEKI_RUN_LARGE_DOWNLOAD_TEST"
+	largeDownloadDelayEnv     = "REGIELEKI_LARGE_DOWNLOAD_DELAY"
+	largeDownloadTargetSize   = int64(6_000_000_000)
+	largeDownloadMaxRequests  = 10
+	defaultLargeDownloadDelay = 60 * time.Second
 )
 
 func TestCDNAllowsMoreThanSixGB(t *testing.T) {
@@ -24,6 +27,7 @@ func TestCDNAllowsMoreThanSixGB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("convertInput returned an error: %v", err)
 	}
+	delay := largeDownloadDelay(t)
 
 	client := &http.Client{}
 	var totalDownloaded int64
@@ -33,6 +37,10 @@ func TestCDNAllowsMoreThanSixGB(t *testing.T) {
 		requestNumber++
 		if requestNumber > largeDownloadMaxRequests {
 			t.Fatalf("download did not reach 6 GB within %d requests; received %s", largeDownloadMaxRequests, formatBytes(totalDownloaded))
+		}
+		if requestNumber > 1 {
+			t.Logf("waiting %s before request %d", delay, requestNumber)
+			time.Sleep(delay)
 		}
 		request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, conversion.DownloadURL, nil)
 		if err != nil {
@@ -69,10 +77,27 @@ func TestCDNAllowsMoreThanSixGB(t *testing.T) {
 	t.Logf("CDN streamed %s successfully across %d request(s) for %s", formatBytes(totalDownloaded), requestNumber, conversion.FileID)
 }
 
+func largeDownloadDelay(t *testing.T) time.Duration {
+	t.Helper()
+
+	value := os.Getenv(largeDownloadDelayEnv)
+	if value == "" {
+		return defaultLargeDownloadDelay
+	}
+
+	delay, err := time.ParseDuration(value)
+	if err != nil || delay < 0 {
+		t.Fatalf("%s must be a non-negative duration such as 60s: %q", largeDownloadDelayEnv, value)
+	}
+	return delay
+}
+
 func Example_largeDownloadTestCommand() {
 	fmt.Println("$env:REGIELEKI_RUN_LARGE_DOWNLOAD_TEST = \"1\"")
+	fmt.Println("$env:REGIELEKI_LARGE_DOWNLOAD_DELAY = \"60s\"")
 	fmt.Println("go test -run '^TestCDNAllowsMoreThanSixGB$' -count=1 -v")
 	// Output:
 	// $env:REGIELEKI_RUN_LARGE_DOWNLOAD_TEST = "1"
+	// $env:REGIELEKI_LARGE_DOWNLOAD_DELAY = "60s"
 	// go test -run '^TestCDNAllowsMoreThanSixGB$' -count=1 -v
 }
