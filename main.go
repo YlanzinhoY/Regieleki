@@ -121,7 +121,7 @@ func downloadFile(
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		body, readErr := io.ReadAll(io.LimitReader(response.Body, 2048))
-		message := strings.TrimSpace(string(body))
+		message := compactMessage(string(body))
 		if readErr != nil || message == "" {
 			message = http.StatusText(response.StatusCode)
 		}
@@ -188,6 +188,14 @@ func responseFilename(response *http.Response, fileID string) string {
 		}
 	}
 	return "file_" + fileID
+}
+
+func compactMessage(message string) string {
+	message = strings.Join(strings.Fields(message), " ")
+	if len(message) > 240 {
+		return message[:240] + "..."
+	}
+	return message
 }
 
 func safeFilename(name string, fallback string) string {
@@ -347,8 +355,16 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if model.state == stateDownloading {
 			return model, nil
 		}
-		if model.state == stateCompleted || model.state == stateError {
+		if model.state == stateCompleted {
 			model.reset()
+			return model, nil
+		}
+		if model.state == stateError && model.conversion != nil {
+			return model, model.beginDownload(*model.conversion)
+		}
+		if model.state == stateError {
+			model.state = stateInput
+			model.downloadError = nil
 			return model, nil
 		}
 
@@ -359,13 +375,7 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 
-		model.conversion = &conversion
-		model.state = stateDownloading
-		model.downloaded = 0
-		model.total = 0
-		model.speed = 0
-		model.downloadError = nil
-		return model, startDownload(model.context, conversion, model.outputDir, model.send)
+		return model, model.beginDownload(conversion)
 	case tea.KeyBackspace, tea.KeyDelete:
 		if model.state == stateInput {
 			inputRunes := []rune(model.input)
@@ -380,6 +390,16 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return model, nil
+}
+
+func (model *model) beginDownload(conversion Conversion) tea.Cmd {
+	model.conversion = &conversion
+	model.state = stateDownloading
+	model.downloaded = 0
+	model.total = 0
+	model.speed = 0
+	model.downloadError = nil
+	return startDownload(model.context, conversion, model.outputDir, model.send)
 }
 
 func (model *model) reset() {
@@ -406,9 +426,11 @@ func (model *model) View() string {
 	case stateCompleted:
 		content = append(content, "", model.completedView())
 	case stateError:
-		content = append(content, "", errorStyle.Render(
-			fmt.Sprintf("Falha no download:\n%s", model.downloadError),
-		))
+		errorMessage := fmt.Sprintf("Falha no download:\n%s", model.downloadError)
+		if model.conversion != nil {
+			errorMessage += fmt.Sprintf("\n\nURL:\n%s", model.conversion.DownloadURL)
+		}
+		content = append(content, "", errorStyle.Render(errorMessage))
 		content = append(content, helpStyle.Render("Pressione Enter para tentar novamente ou Esc para sair."))
 	default:
 		content = append(content, helpStyle.Render("Enter baixa o arquivo  |  Esc/Ctrl+C sai"))
@@ -423,6 +445,8 @@ func (model *model) downloadView() string {
 	if model.total > 0 {
 		percentage := float64(model.downloaded) / float64(model.total) * 100
 		size = fmt.Sprintf("%s / %s (%.1f%%)", size, formatBytes(model.total), percentage)
+	} else {
+		size += " / tamanho desconhecido"
 	}
 
 	return panelStyle.Render(fmt.Sprintf(
@@ -447,7 +471,7 @@ func (model *model) completedView() string {
 
 func progressBar(downloaded int64, total int64, width int) string {
 	if total <= 0 {
-		return "[" + strings.Repeat(">", width) + "]"
+		return "[ streaming | tamanho desconhecido ]"
 	}
 
 	ratio := float64(downloaded) / float64(total)
