@@ -575,6 +575,7 @@ var convertCommand = &cobra.Command{
 }
 
 func init() {
+	cobra.MousetrapHelpText = ""
 	rootCommand.PersistentFlags().StringVarP(
 		&outputDirectory,
 		"output-dir",
