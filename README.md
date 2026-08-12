@@ -4,6 +4,8 @@
 
 Regieleki is a terminal-based downloader written in Go, using Cobra, Bubble Tea, and Lip Gloss. It takes a file ID, builds the configured endpoint, and downloads the file to your computer using streaming.
 
+On Windows, the application requests a compact `96 x 30` console layout at startup. When launched inside Windows Terminal, it automatically opens the interactive TUI in a new compact window using `wt.exe`; `--version`, `convert <id>`, and help commands remain in the current terminal. This is implemented with Windows-only build tags; Linux and other platforms use the terminal's existing size.
+
 ## Requirements
 
 * Go 1.26 or later
@@ -41,6 +43,12 @@ The Windows script generates `bin/regieleki.exe` using flags to reduce the binar
 .\build.ps1
 ```
 
+Development builds show version `dev`. A clean build from a release tag on `main` automatically embeds the tag version, such as `0.0.3`. You can also set it explicitly:
+
+```powershell
+.\build.ps1 -Version 0.0.3
+```
+
 The build uses:
 
 * `-trimpath` to remove local file paths from the binary;
@@ -50,7 +58,7 @@ The build uses:
 The equivalent command on any system with Go installed is:
 
 ```bash
-go build -trimpath -buildvcs=false -ldflags="-s -w" -o bin/regieleki .
+go build -trimpath -buildvcs=false -ldflags="-s -w -X main.version=dev" -o bin/regieleki .
 ```
 
 Then run:
@@ -81,12 +89,16 @@ The `convert` command prints the URL. Automatic downloading happens through the 
 ## TUI Controls
 
 * Type: enter the file ID;
+* Paste: use `Ctrl+Shift+V` in Windows Terminal or `Ctrl+V` in other terminals;
 * `Enter`: start the download;
+* `Esc` or `S` during a download: stop it and return to the file ID screen;
 * `Enter` after an error: try again;
 * `Enter` after completion: start another download;
 * `Esc` or `Ctrl+C`: exit.
 
 During the download, the interface displays the active mirror number, progress, amount of data received, percentage when the server provides the total file size, current download speed, and destination path. If all mirrors fail, the error screen identifies the last mirror attempted.
+
+Each download starts from a random mirror between `cdn18` and `cdn50`, then follows the remaining mirrors in circular order if failover is needed.
 
 ## File Behavior
 

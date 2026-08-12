@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	mathrand "math/rand/v2"
 	"mime"
 	"net/http"
 	"os"
@@ -18,6 +19,10 @@ type downloadProgress struct {
 	Total      int64
 	Speed      float64
 	Mirror     int
+}
+
+var selectMirrorStart = func(count int) int {
+	return mathrand.IntN(count)
 }
 
 type downloadResult struct {
@@ -107,7 +112,8 @@ func downloadFile(
 
 	client := &http.Client{}
 	var lastError error
-	for mirrorIndex, downloadURL := range downloadURLs {
+	for _, mirrorIndex := range orderedMirrorIndexes(len(downloadURLs)) {
+		downloadURL := downloadURLs[mirrorIndex]
 		mirrorNumber := workerMirrorStart + mirrorIndex
 		report(downloadProgress{Mirror: mirrorNumber})
 		result, err := downloadFromURL(ctx, client, conversion, downloadURL, mirrorNumber, directory, report)
@@ -121,6 +127,19 @@ func downloadFile(
 	}
 
 	return downloadResult{}, fmt.Errorf("all CDN mirrors failed: %w", lastError)
+}
+
+func orderedMirrorIndexes(count int) []int {
+	if count <= 0 {
+		return nil
+	}
+
+	start := selectMirrorStart(count)
+	indexes := make([]int, 0, count)
+	for offset := 0; offset < count; offset++ {
+		indexes = append(indexes, (start+offset)%count)
+	}
+	return indexes
 }
 
 func downloadFromURL(

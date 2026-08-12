@@ -36,6 +36,10 @@ func TestDownloadFileTreatsCDNLimitResponsesAsBlocked(t *testing.T) {
 }
 
 func TestDownloadFileFallsBackToNextCDNMirror(t *testing.T) {
+	previousMirrorStart := selectMirrorStart
+	selectMirrorStart = func(int) int { return 0 }
+	defer func() { selectMirrorStart = previousMirrorStart }()
+
 	firstMirror := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, _ *http.Request) {
 		responseWriter.WriteHeader(http.StatusForbidden)
 	}))
@@ -76,5 +80,25 @@ func TestDownloadFileFallsBackToNextCDNMirror(t *testing.T) {
 	}
 	if result.Mirror != 19 {
 		t.Fatalf("expected fallback mirror 19, got %d", result.Mirror)
+	}
+}
+
+func TestOrderedMirrorIndexesStartsAtSelectedMirror(t *testing.T) {
+	previousMirrorStart := selectMirrorStart
+	selectMirrorStart = func(int) int { return 32 }
+	defer func() { selectMirrorStart = previousMirrorStart }()
+
+	indexes := orderedMirrorIndexes(33)
+	if len(indexes) != 33 {
+		t.Fatalf("expected 33 mirror indexes, got %d", len(indexes))
+	}
+	if indexes[0] != 32 {
+		t.Fatalf("expected the first mirror index to be 32, got %d", indexes[0])
+	}
+	if indexes[1] != 0 {
+		t.Fatalf("expected mirror order to wrap to index 0, got %d", indexes[1])
+	}
+	if indexes[len(indexes)-1] != 31 {
+		t.Fatalf("expected the last mirror index to be 31, got %d", indexes[len(indexes)-1])
 	}
 }
