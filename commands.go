@@ -41,7 +41,7 @@ func init() {
 		&outputDirectory,
 		"output-dir",
 		"o",
-		".",
+		defaultDownloadDirectory(),
 		"pasta onde os arquivos serão salvos",
 	)
 	rootCommand.AddCommand(convertCommand)

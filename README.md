@@ -19,6 +19,8 @@ go run .
 
 Enter the file ID in the TUI and press `Enter`. The download will start automatically.
 
+On Windows, downloads are saved by default in `%USERPROFILE%\Downloads` (usually `C:\Users\<user>\Downloads`).
+
 To choose the destination directory:
 
 ```powershell
@@ -99,4 +101,4 @@ During the download, the interface displays the progress, amount of data receive
 go test ./...
 ```
 
-The endpoint used by the project is configured in `workerBaseURL`, located in the `main.go` file.
+The endpoint used by the project is configured in `workerBaseURL`, located in `conversion.go`.
