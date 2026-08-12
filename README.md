@@ -4,6 +4,8 @@
 
 Regieleki is a terminal-based downloader written in Go, using Cobra, Bubble Tea, and Lip Gloss. It takes a file ID, builds the configured endpoint, and downloads the file to your computer using streaming.
 
+On Windows, the application requests a compact `96 x 30` console layout at startup. This is implemented with Windows-only build tags; Linux and other platforms use the terminal's existing size.
+
 ## Requirements
 
 * Go 1.26 or later
