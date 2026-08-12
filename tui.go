@@ -5,38 +5,52 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+const uiWidth = 72
+
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("205")).
+			Foreground(lipgloss.Color("220")).
+			Padding(0, 1).
 			MarginBottom(1)
+	versionStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
 	inputStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("62")).
 			Padding(0, 1).
-			Width(64)
+			Width(uiWidth)
+	cursorStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("220"))
+	pasteButtonStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("62")).
+				Foreground(lipgloss.Color("252")).
+				Padding(0, 1)
 	panelStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("62")).
 			Padding(1, 2).
-			Width(64)
+			Width(uiWidth)
 	successStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("42")).
 			Foreground(lipgloss.Color("42")).
 			Padding(1, 2).
-			Width(64)
+			Width(uiWidth)
 	errorStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("204")).
 			Foreground(lipgloss.Color("204")).
 			Padding(1, 2).
-			Width(64)
+			Width(uiWidth)
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			MarginTop(1)
@@ -58,6 +72,8 @@ type downloadProgressMsg struct {
 	Mirror     int
 }
 
+type cursorBlinkMsg struct{}
+
 type downloadCompletedMsg struct {
 	Result downloadResult
 }
@@ -74,6 +90,7 @@ type model struct {
 	total         int64
 	speed         float64
 	mirror        int
+	cursorVisible bool
 	outputPath    string
 	downloadError error
 	cdnBlocked    bool
@@ -93,13 +110,16 @@ func newModel(outputDir string, downloadContext context.Context, cancel context.
 }
 
 func (model *model) Init() tea.Cmd {
-	return nil
+	return blinkCursor()
 }
 
 func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
 	case tea.KeyMsg:
 		return model.updateKey(message)
+	case cursorBlinkMsg:
+		model.cursorVisible = !model.cursorVisible
+		return model, blinkCursor()
 	case downloadProgressMsg:
 		if model.state == stateDownloading {
 			model.downloaded = message.Downloaded
@@ -219,10 +239,12 @@ func (model *model) reset() {
 
 func (model *model) View() string {
 	content := []string{
-		titleStyle.Render("Regieleki"),
+		titleStyle.Render("⚡ Regieleki ⚡"),
 		"Blazing fast PixelDrain TUI downloader",
+		versionStyle.Render(fmt.Sprintf("Version %s", version)),
 		"Enter the file ID:",
-		inputStyle.Render(model.input),
+		model.inputView(),
+		pasteButtonStyle.Render("Paste ID: Ctrl+Shift+V / Ctrl+V"),
 	}
 
 	switch model.state {
@@ -231,7 +253,11 @@ func (model *model) View() string {
 	case stateCompleted:
 		content = append(content, "", model.completedView())
 	case stateError:
-		errorMessage := fmt.Sprintf("Download failed on Mirror %d:\n%s", model.mirror, model.downloadError)
+		errorTitle := "Download failed"
+		if model.mirror > 0 {
+			errorTitle = fmt.Sprintf("Download failed on Mirror %d", model.mirror)
+		}
+		errorMessage := fmt.Sprintf("%s:\n%s", errorTitle, model.downloadError)
 		content = append(content, "", errorStyle.Render(errorMessage))
 		if model.cdnBlocked {
 			content = append(content, helpStyle.Render("The CDN limit was reached. Press Enter to enter another ID or Esc to exit."))
@@ -243,6 +269,20 @@ func (model *model) View() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, content...)
+}
+
+func (model *model) inputView() string {
+	cursor := " "
+	if model.state == stateInput && model.cursorVisible {
+		cursor = cursorStyle.Render("▌")
+	}
+	return inputStyle.Render(model.input + cursor)
+}
+
+func blinkCursor() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg {
+		return cursorBlinkMsg{}
+	})
 }
 
 func (model *model) downloadView() string {

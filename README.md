@@ -41,6 +41,12 @@ The Windows script generates `bin/regieleki.exe` using flags to reduce the binar
 .\build.ps1
 ```
 
+Development builds show version `dev`. A clean build from a release tag on `main` automatically embeds the tag version, such as `0.0.3`. You can also set it explicitly:
+
+```powershell
+.\build.ps1 -Version 0.0.3
+```
+
 The build uses:
 
 * `-trimpath` to remove local file paths from the binary;
@@ -50,7 +56,7 @@ The build uses:
 The equivalent command on any system with Go installed is:
 
 ```bash
-go build -trimpath -buildvcs=false -ldflags="-s -w" -o bin/regieleki .
+go build -trimpath -buildvcs=false -ldflags="-s -w -X main.version=dev" -o bin/regieleki .
 ```
 
 Then run:
@@ -81,6 +87,7 @@ The `convert` command prints the URL. Automatic downloading happens through the 
 ## TUI Controls
 
 * Type: enter the file ID;
+* Paste: use `Ctrl+Shift+V` in Windows Terminal or `Ctrl+V` in other terminals;
 * `Enter`: start the download;
 * `Enter` after an error: try again;
 * `Enter` after completion: start another download;

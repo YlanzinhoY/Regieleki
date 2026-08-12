@@ -44,3 +44,24 @@ func TestModelViewShowsCurrentMirrorOnError(t *testing.T) {
 		t.Fatalf("expected mirror number in error view, got %q", view)
 	}
 }
+
+func TestModelViewShowsVersionAndPasteHint(t *testing.T) {
+	appModel := newModel(".", context.Background(), func() {})
+	view := appModel.View()
+
+	for _, expected := range []string{"Version " + version, "Paste ID: Ctrl+Shift+V / Ctrl+V"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("expected %q in view, got %q", expected, view)
+		}
+	}
+}
+
+func TestModelInputShowsBlinkingCursor(t *testing.T) {
+	appModel := newModel(".", context.Background(), func() {})
+	appModel.input = "AXCPM2gM"
+	appModel.cursorVisible = true
+
+	if view := appModel.inputView(); !strings.Contains(view, "▌") {
+		t.Fatalf("expected blinking cursor in input view, got %q", view)
+	}
+}
