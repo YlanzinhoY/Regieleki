@@ -7,7 +7,12 @@ $ErrorActionPreference = "Stop"
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = "dev"
     $branch = (& git branch --show-current 2>$null).Trim()
-    $tag = (& git describe --tags --exact-match HEAD 2>$null | Select-Object -First 1).Trim()
+    $tag = & git tag --points-at HEAD 2>$null | Where-Object { $_ -match "^v" } | Select-Object -First 1
+    if ($null -eq $tag) {
+        $tag = ""
+    } else {
+        $tag = $tag.Trim()
+    }
     & git diff --quiet
     $workingTreeClean = $LASTEXITCODE -eq 0
     & git diff --cached --quiet
