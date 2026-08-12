@@ -190,7 +190,7 @@ func (model *model) View() string {
 		titleStyle.Render("Regieleki"),
 		"Blazing fast PixelDrain TUI downloader",
 		"Digite o ID do arquivo:",
-		inputStyle.Render(model.input + ">"),
+		inputStyle.Render(model.input),
 	}
 
 	switch model.state {
