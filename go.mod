@@ -1,4 +1,4 @@
-module pixeldrain-worker
+module regieleki
 
 go 1.26
 

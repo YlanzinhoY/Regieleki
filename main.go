@@ -110,7 +110,7 @@ func downloadFile(
 	if err != nil {
 		return downloadResult{}, fmt.Errorf("criando requisicao: %w", err)
 	}
-	request.Header.Set("User-Agent", "pixeldrain-worker/1.0")
+	request.Header.Set("User-Agent", "regieleki/1.0")
 
 	client := &http.Client{}
 	response, err := client.Do(request)
@@ -415,7 +415,8 @@ func (model *model) reset() {
 
 func (model *model) View() string {
 	content := []string{
-		titleStyle.Render("PixelDrain Downloader"),
+		titleStyle.Render("Regieleki"),
+		"Blazing fast PixelDrain TUI downloader",
 		"Digite o ID do arquivo:",
 		inputStyle.Render(model.input + ">"),
 	}
@@ -547,8 +548,8 @@ func runInteractive(outputDir string) error {
 }
 
 var rootCommand = &cobra.Command{
-	Use:   "pixeldrain-worker",
-	Short: "Baixa arquivos do PixelDrain usando a TUI",
+	Use:   "regieleki",
+	Short: "Blazing fast PixelDrain TUI downloader",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		return runInteractive(outputDirectory)
 	},
