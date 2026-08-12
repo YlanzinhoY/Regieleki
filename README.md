@@ -105,10 +105,12 @@ The large CDN download test is opt-in because it consumes at least 6 GB of bandw
 
 ```powershell
 $env:REGIELEKI_RUN_LARGE_DOWNLOAD_TEST = "1"
+$env:REGIELEKI_LARGE_DOWNLOAD_DELAY = "60s"
 go test -run '^TestCDNAllowsMoreThanSixGB$' -count=1 -v
 Remove-Item Env:REGIELEKI_RUN_LARGE_DOWNLOAD_TEST
+Remove-Item Env:REGIELEKI_LARGE_DOWNLOAD_DELAY
 ```
 
-The test uses file ID `KpQfUiTC` and repeats the request until the cumulative amount exceeds 6 GB.
+The test uses file ID `KpQfUiTC`, waits 60 seconds between requests by default, and repeats the request until the cumulative amount exceeds 6 GB. Set `REGIELEKI_LARGE_DOWNLOAD_DELAY` to another Go duration if needed.
 
 The endpoint used by the project is configured in `workerBaseURL`, located in `conversion.go`.
