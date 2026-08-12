@@ -74,4 +74,7 @@ func TestDownloadFileFallsBackToNextCDNMirror(t *testing.T) {
 	if result.Downloaded != int64(len("mirror data")) {
 		t.Fatalf("expected %d downloaded bytes, got %d", len("mirror data"), result.Downloaded)
 	}
+	if result.Mirror != 19 {
+		t.Fatalf("expected fallback mirror 19, got %d", result.Mirror)
+	}
 }

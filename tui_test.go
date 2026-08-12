@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,5 +28,19 @@ func TestModelDoesNotRetryAfterCDNLimit(t *testing.T) {
 	}
 	if updated.cdnBlocked {
 		t.Fatal("expected CDN blocked state to be cleared")
+	}
+}
+
+func TestModelViewShowsCurrentMirrorOnError(t *testing.T) {
+	appModel := newModel(".", context.Background(), func() {})
+	appModel.state = stateError
+	appModel.mirror = 40
+	appModel.downloadError = &cdnMirrorError{
+		Mirror: 40,
+		Err:    &cdnLimitError{StatusCode: 403, Mirror: 40},
+	}
+
+	if view := appModel.View(); !strings.Contains(view, "Download failed on Mirror 40") {
+		t.Fatalf("expected mirror number in error view, got %q", view)
 	}
 }
