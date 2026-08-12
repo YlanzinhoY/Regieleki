@@ -34,6 +34,11 @@ var (
 				BorderForeground(lipgloss.Color("62")).
 				Foreground(lipgloss.Color("252")).
 				Padding(0, 1)
+	stopButtonStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("204")).
+			Foreground(lipgloss.Color("204")).
+			Padding(0, 1)
 	panelStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("62")).
@@ -66,6 +71,7 @@ const (
 )
 
 type downloadProgressMsg struct {
+	DownloadID uint64
 	Downloaded int64
 	Total      int64
 	Speed      float64
@@ -75,29 +81,33 @@ type downloadProgressMsg struct {
 type cursorBlinkMsg struct{}
 
 type downloadCompletedMsg struct {
-	Result downloadResult
+	DownloadID uint64
+	Result     downloadResult
 }
 
 type downloadFailedMsg struct {
-	Err error
+	DownloadID uint64
+	Err        error
 }
 
 type model struct {
-	input         string
-	conversion    *Conversion
-	state         screenState
-	downloaded    int64
-	total         int64
-	speed         float64
-	mirror        int
-	cursorVisible bool
-	outputPath    string
-	downloadError error
-	cdnBlocked    bool
-	outputDir     string
-	downloadCtx   context.Context
-	cancel        context.CancelFunc
-	send          func(tea.Msg)
+	input          string
+	conversion     *Conversion
+	state          screenState
+	downloaded     int64
+	total          int64
+	speed          float64
+	mirror         int
+	cursorVisible  bool
+	outputPath     string
+	downloadError  error
+	cdnBlocked     bool
+	downloadID     uint64
+	downloadCancel context.CancelFunc
+	outputDir      string
+	downloadCtx    context.Context
+	cancel         context.CancelFunc
+	send           func(tea.Msg)
 }
 
 func newModel(outputDir string, downloadContext context.Context, cancel context.CancelFunc) *model {
@@ -121,7 +131,7 @@ func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.cursorVisible = !model.cursorVisible
 		return model, blinkCursor()
 	case downloadProgressMsg:
-		if model.state == stateDownloading {
+		if model.state == stateDownloading && message.DownloadID == model.downloadID {
 			model.downloaded = message.Downloaded
 			model.total = message.Total
 			model.speed = message.Speed
@@ -130,13 +140,20 @@ func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case downloadCompletedMsg:
+		if model.state != stateDownloading || message.DownloadID != model.downloadID {
+			return model, nil
+		}
 		model.state = stateCompleted
 		model.downloaded = message.Result.Downloaded
 		model.total = message.Result.Total
 		model.speed = message.Result.AverageSpeed
 		model.mirror = message.Result.Mirror
 		model.outputPath = message.Result.Path
+		model.downloadCancel = nil
 	case downloadFailedMsg:
+		if model.state != stateDownloading || message.DownloadID != model.downloadID {
+			return model, nil
+		}
 		model.state = stateError
 		model.downloadError = message.Err
 		var limitError *cdnLimitError
@@ -147,6 +164,7 @@ func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else if model.cdnBlocked && limitError.Mirror > 0 {
 			model.mirror = limitError.Mirror
 		}
+		model.downloadCancel = nil
 	}
 
 	return model, nil
@@ -154,7 +172,16 @@ func (model *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch message.Type {
-	case tea.KeyCtrlC, tea.KeyEsc:
+	case tea.KeyCtrlC:
+		if model.cancel != nil {
+			model.cancel()
+		}
+		return model, tea.Quit
+	case tea.KeyEsc:
+		if model.state == stateDownloading {
+			model.reset()
+			return model, nil
+		}
 		if model.cancel != nil {
 			model.cancel()
 		}
@@ -199,6 +226,10 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.KeyRunes:
+		if model.state == stateDownloading && strings.EqualFold(string(message.Runes), "s") {
+			model.reset()
+			return model, nil
+		}
 		if model.state == stateInput {
 			pastedInput := string(message.Runes)
 			if message.Paste {
@@ -213,6 +244,12 @@ func (model *model) updateKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (model *model) beginDownload(conversion Conversion) tea.Cmd {
+	if model.downloadCancel != nil {
+		model.downloadCancel()
+	}
+	model.downloadID++
+	downloadContext, downloadCancel := context.WithCancel(model.downloadCtx)
+	model.downloadCancel = downloadCancel
 	model.conversion = &conversion
 	model.state = stateDownloading
 	model.downloaded = 0
@@ -221,10 +258,15 @@ func (model *model) beginDownload(conversion Conversion) tea.Cmd {
 	model.mirror = 0
 	model.downloadError = nil
 	model.cdnBlocked = false
-	return startDownload(model.downloadCtx, conversion, model.outputDir, model.send)
+	return startDownload(downloadContext, conversion, model.outputDir, model.downloadID, model.send)
 }
 
 func (model *model) reset() {
+	if model.downloadCancel != nil {
+		model.downloadCancel()
+		model.downloadCancel = nil
+	}
+	model.downloadID++
 	model.input = ""
 	model.conversion = nil
 	model.state = stateInput
@@ -235,6 +277,7 @@ func (model *model) reset() {
 	model.outputPath = ""
 	model.downloadError = nil
 	model.cdnBlocked = false
+	model.cursorVisible = true
 }
 
 func (model *model) View() string {
@@ -249,7 +292,7 @@ func (model *model) View() string {
 
 	switch model.state {
 	case stateDownloading:
-		content = append(content, "", model.downloadView())
+		content = append(content, "", model.downloadView(), stopButtonStyle.Render("Stop download: Esc / S"))
 	case stateCompleted:
 		content = append(content, "", model.completedView())
 	case stateError:
@@ -361,6 +404,7 @@ func startDownload(
 	downloadContext context.Context,
 	conversion Conversion,
 	outputDir string,
+	downloadID uint64,
 	send func(tea.Msg),
 ) tea.Cmd {
 	return func() tea.Msg {
@@ -368,6 +412,7 @@ func startDownload(
 			result, err := downloadFile(downloadContext, conversion, outputDir, func(progress downloadProgress) {
 				if send != nil {
 					send(downloadProgressMsg{
+						DownloadID: downloadID,
 						Downloaded: progress.Downloaded,
 						Total:      progress.Total,
 						Speed:      progress.Speed,
@@ -379,10 +424,10 @@ func startDownload(
 				return
 			}
 			if err != nil {
-				send(downloadFailedMsg{Err: err})
+				send(downloadFailedMsg{DownloadID: downloadID, Err: err})
 				return
 			}
-			send(downloadCompletedMsg{Result: result})
+			send(downloadCompletedMsg{DownloadID: downloadID, Result: result})
 		}()
 		return nil
 	}
