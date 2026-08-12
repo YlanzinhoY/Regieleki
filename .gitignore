@@ -1,2 +1,4 @@
 .gocache/
 *.exe
+/bin/*
+!/bin/.gitkeep
