@@ -91,11 +91,14 @@ The `convert` command prints the URL. Automatic downloading happens through the 
 * Type: enter the file ID;
 * Paste: use `Ctrl+Shift+V` in Windows Terminal or `Ctrl+V` in other terminals;
 * `Enter`: start the download;
+* `Esc` or `S` during a download: stop it and return to the file ID screen;
 * `Enter` after an error: try again;
 * `Enter` after completion: start another download;
 * `Esc` or `Ctrl+C`: exit.
 
 During the download, the interface displays the active mirror number, progress, amount of data received, percentage when the server provides the total file size, current download speed, and destination path. If all mirrors fail, the error screen identifies the last mirror attempted.
+
+Each download starts from a random mirror between `cdn18` and `cdn50`, then follows the remaining mirrors in circular order if failover is needed.
 
 ## File Behavior
 
