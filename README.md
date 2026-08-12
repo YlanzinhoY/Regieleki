@@ -86,7 +86,7 @@ The `convert` command prints the URL. Automatic downloading happens through the 
 * `Enter` after completion: start another download;
 * `Esc` or `Ctrl+C`: exit.
 
-During the download, the interface displays the progress, amount of data received, percentage when the server provides the total file size, current download speed, and destination path.
+During the download, the interface displays the active mirror number, progress, amount of data received, percentage when the server provides the total file size, current download speed, and destination path. If all mirrors fail, the error screen identifies the last mirror attempted.
 
 ## File Behavior
 
